@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme static {
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-page: #f9f9f7;
+  --color-surface: #fcfcfb;
+  --color-surface-2: #f3f2ee;
+  --color-ink: #0b0b0b;
+  --color-ink-2: #52514e;
+  --color-muted: #898781;
+  --color-gridline: #e1e0d9;
+  --color-axis: #c3c2b7;
+  --color-accent: #2a78d6;
+
+  /* cause palette (validated categorical slots 1-4) */
+  --color-c-mid: #2a78d6;
+  --color-c-sig: #eb6834;
+  --color-c-geo: #1baf7a;
+  --color-c-inc: #eda100;
+
+  /* status */
+  --color-good: #0ca30c;
+  --color-good-text: #006300;
+  --color-warning: #fab219;
+  --color-serious: #ec835a;
+  --color-critical: #d03b3b;
+
+  /* map */
+  --color-road: #d9d7cf;
+  --color-road-major: #c3c2b7;
+  --color-water: #cfe1f3;
+  --color-land: #f1f0eb;
+
+  --color-sim-bg: #fff3d6;
+  --color-sim-ink: #7a4b00;
+}
+
+html {
+  color-scheme: light;
+}
+body {
+  @apply bg-page text-ink font-sans text-sm overflow-x-hidden;
+}
+
+@keyframes pulse-ring {
+  0% { opacity: 0.7; transform: scale(0.6); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+.pulse-ring {
+  animation: pulse-ring 1.4s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes dash-move {
+  to { stroke-dashoffset: -11; }
+}
+.route-anim {
+  stroke-dasharray: 6 5;
+  animation: dash-move 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring, .route-anim { animation: none; }
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
