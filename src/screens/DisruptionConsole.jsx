@@ -1,8 +1,12 @@
+import { Suspense, lazy, useState } from 'react'
 import LineChart from '../components/LineChart'
-import { Button, Card, EVENT_STATUS, SimTag, Slider, StatusChip, SubHeading } from '../components/ui'
+import { hasWebGL } from '../components/three/webgl'
+import { Button, Card, EVENT_STATUS, Segmented, SimTag, Slider, StatusChip, SubHeading } from '../components/ui'
 import { BEST_SPLIT, FAST_BAND, SPLITS, divertedTrip, forecastSeries, options, residentDelay } from '../engine/closure'
 import { EVENTS, clockLabel } from '../engine/events'
 import { useDemo } from '../engine/store'
+
+const DiversionMap3D = lazy(() => import('../components/three/DiversionMap3D'))
 
 const pct = s => `${Math.round(s * 100)}%`
 
@@ -52,12 +56,22 @@ function EventCard({ ev, status, clock }) {
   )
 }
 
-function SchematicMap({ ev, split }) {
+function SchematicMap({ ev, split, statusKey }) {
+  const [view, setView] = useState(() => (hasWebGL() ? '3d' : '2d'))
   const wc = 3 + 9 * split
   const wb = 3 + 9 * (1 - split)
   const jx = [250, 360, 470]
   return (
-    <Card title="Schematic map" hint="Not to scale · line width shows the share of diverted traffic">
+    <Card
+      title="Schematic map"
+      hint="Not to scale · route width and traffic show the share of diverted vehicles"
+      right={<Segmented label="Map view" value={view} onChange={setView} options={[{ value: '3d', label: '3D' }, { value: '2d', label: '2D' }]} />}
+    >
+      {view === '3d' ? (
+        <Suspense fallback={<div className="grid h-[320px] place-items-center rounded-lg bg-land text-xs text-muted">Loading 3D map…</div>}>
+          <DiversionMap3D ev={ev} split={split} statusKey={statusKey} />
+        </Suspense>
+      ) : (
       <svg viewBox="0 0 720 260" className="block h-auto w-full rounded-lg bg-land" role="img" aria-label="Schematic map of the closure and diversion routes">
         {/* closed road */}
         <path d="M 80 130 C 250 120 470 120 640 130" fill="none" stroke="var(--color-critical)" strokeWidth="8" strokeDasharray="14 8" opacity=".85" />
@@ -86,6 +100,7 @@ function SchematicMap({ ev, split }) {
           </g>
         ))}
       </svg>
+      )}
     </Card>
   )
 }
@@ -118,7 +133,7 @@ export default function DisruptionConsole() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <div className="grid content-start gap-4">
+        <div className="grid min-w-0 content-start gap-4">
           <EventCard ev={ev} status={status} clock={clock} />
 
           <Card title="Options" hint="FlowGuard forecasts the cost; the authority decides">
@@ -159,8 +174,8 @@ export default function DisruptionConsole() {
           </Card>
         </div>
 
-        <div className="grid content-start gap-4">
-          <SchematicMap ev={ev} split={split} />
+        <div className="grid min-w-0 content-start gap-4">
+          <SchematicMap ev={ev} split={split} statusKey={status.key} />
 
           <Card title="Inflow forecast" hint={`Extra vehicles per 5 minutes arriving on ${ev.corridor} at a ${pct(split)} split`}>
             <LineChart
@@ -186,7 +201,7 @@ export default function DisruptionConsole() {
               </div>
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
-              <div>
+              <div className="min-w-0">
                 <SubHeading className="mt-0">Corridor residents' delay (s per vehicle)</SubHeading>
                 <LineChart
                   ariaLabel="Residents' delay by split"
@@ -199,7 +214,7 @@ export default function DisruptionConsole() {
                   height={170}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <SubHeading className="mt-0">Diverted drivers' average trip (min)</SubHeading>
                 <LineChart
                   ariaLabel="Diverted trip time by split"

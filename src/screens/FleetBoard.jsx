@@ -11,7 +11,8 @@ function RouteComparison({ order, a }) {
   const vals = a.routes.map(r => r.eta).filter(v => v !== null)
   const max = Math.max(end, ...vals) + 15
   const min = -5
-  const X = v => ((v - min) / (max - min)) * 100
+  // Bars use 80% of the track so the ETA text after each bar always fits.
+  const X = v => ((v - min) / (max - min)) * 80
   return (
     <Card title={`Route comparison · ${order.id}`} hint={`${order.from} → ${order.to} · ${order.vehicle} · window ${fmtClock(order.win[0])}–${fmtClock(end)}`}>
       <div className="relative grid gap-2.5">
@@ -61,7 +62,32 @@ export default function FleetBoard() {
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <Card title="Deliveries" right={<SimTag>Sample data</SimTag>} hint="Now 10:00 · click an order to compare routes">
-          <div className="overflow-x-auto">
+          {/* Phones: one card per order */}
+          <ul className="grid gap-2 md:hidden">
+            {rows.map(({ o, a }) => (
+              <li key={o.id}>
+                <button
+                  onClick={() => setSel(o.id)}
+                  aria-pressed={o.id === sel}
+                  className={`grid w-full cursor-pointer gap-1.5 rounded-lg border p-3 text-left text-[13px] ${o.id === sel ? 'border-accent bg-accent/5' : 'border-black/10'}`}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <b className="tabular-nums">{o.id} · {o.vehicle}</b>
+                    <StatusChip color={a.risk.color} icon={a.risk.icon} label={a.risk.label} />
+                  </span>
+                  <span>{o.to} <span className="text-xs text-muted">from {o.from}</span></span>
+                  <span className="text-xs text-ink-2 tabular-nums">Window {fmtClock(o.win[0])}–{fmtClock(o.win[1])} · ETA {a.eta === null ? '—' : fmtClock(a.eta)}</span>
+                  {a.action && (
+                    <span className="text-xs">
+                      <b>{a.action.label}</b>
+                      {a.action.saved ? <span className="text-good-text"> · saves {Math.round(a.action.saved)} min</span> : null}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] border-collapse text-[13px]">
               <thead>
                 <tr className="text-left text-xs text-ink-2">

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { hasWebGL } from '../components/three/webgl'
 import { inflowProfile } from '../engine/closure'
 import { CONTROLLERS, JUNCTIONS, P, SCENARIOS, SEED, createArrivalStream, createSim, occupancy, step, summarize } from '../engine/corridor'
 import { DEFAULT_CORRIDOR } from '../engine/events'
 import { useDemo } from '../engine/store'
 import { Button, Card, Segmented, SimTag, Slider } from '../components/ui'
-import { CTRL_COLOR } from '../theme'
+import { CTRL_COLOR, CTRL_SHORT } from '../theme'
 
 
 const JX = [230, 530, 830] // junction x positions in the lane drawing
@@ -111,6 +112,8 @@ const METRICS = [
   { key: 'sideMax', label: 'Longest side-street wait', unit: 's', better: 'low', fmt: v => v },
 ]
 
+const Corridor3D = lazy(() => import('../components/three/Corridor3D'))
+
 const makeWorld = () => ({ stream: createArrivalStream(SEED), sims: CONTROLLERS.map(c => createSim(c.key)) })
 
 const fmtTime = s => [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(n => String(n).padStart(2, '0')).join(':')
@@ -122,6 +125,7 @@ export default function ControlRoom() {
   const [speed, setSpeed] = useState(60)
   const [running, setRunning] = useState(true)
   const [explain, setExplain] = useState(null)
+  const [view, setView] = useState(() => (hasWebGL() ? '3d' : '2d'))
   const [, setFrame] = useState(0)
   // The three lane simulations are mutable objects stepped by the animation loop; `frame` re-renders them.
   const [world, setWorld] = useState(makeWorld)
@@ -200,7 +204,11 @@ export default function ControlRoom() {
             <span className="text-xs text-ink-2">Speed</span>
             <Segmented label="Speed" value={speed} onChange={setSpeed} options={[1, 10, 60].map(v => ({ value: v, label: `${v}×` }))} />
           </div>
-          <div className="flex gap-2">
+          <div className="grid gap-1">
+            <span className="text-xs text-ink-2">View</span>
+            <Segmented label="View" value={view} onChange={setView} options={[{ value: '3d', label: '3D' }, { value: '2d', label: '2D' }]} />
+          </div>
+          <div className="flex flex-wrap gap-2">
             <Button onClick={() => { setExplain(null); setRunning(r => !r) }}>{running ? '❚❚ Pause' : '▶ Run'}</Button>
             <Button onClick={() => restart()}>↺ Restart</Button>
             <Button variant={explain ? 'primary' : 'default'} onClick={pauseAndExplain}>{explain ? 'Resume' : '⏸ Pause and explain'}</Button>
@@ -223,6 +231,28 @@ export default function ControlRoom() {
           </div>
         )}
 
+        {view === '3d' ? (
+          <div className="grid gap-2">
+            <div className="grid gap-2 sm:grid-cols-3">
+              {CONTROLLERS.map((c, i) => (
+                <div key={c.key} className="rounded-lg border border-black/10 px-3 py-2 text-[13px]">
+                  <b className="inline-flex items-center gap-1.5"><i className="inline-block size-2.5 rounded-full" style={{ background: CTRL_COLOR[c.key] }} />{c.label}</b>
+                  <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-2">
+                    <span>delay <b className="tabular-nums text-ink">{stats[i].delay.toFixed(0)} s</b>/veh</span>
+                    <span>green wasted <b className="tabular-nums text-ink">{Math.round(stats[i].wastedPerHour)} s/h</b></span>
+                    <span>spillbacks <b className="tabular-nums text-ink">{stats[i].spill}</b></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Suspense fallback={<div className="grid h-[380px] place-items-center rounded-lg bg-land text-xs text-muted">Loading 3D view…</div>}>
+              <Corridor3D world={world} names={corridor.junctions} highlight={explain ? explain.j : null} />
+            </Suspense>
+            {ex && <p className="rounded-md bg-critical/8 px-2 py-1 text-[13px]"><b>Local adaptive:</b> {ex.ad}</p>}
+            {ex && <p className="rounded-md bg-accent/8 px-2 py-1 text-[13px]"><b>FlowGuard:</b> {ex.fg}</p>}
+            <p className="text-[11px] text-muted">Drag to rotate (desktop). Red glowing box = green light into a full road. Bars beside each link show how full the road ahead is.</p>
+          </div>
+        ) : (
         <div className="grid gap-2">
           {CONTROLLERS.map((c, i) => (
             <div key={c.key} className={`rounded-lg border px-3 pt-2 ${explain && i > 0 ? 'border-ink/40' : 'border-black/10'}`}>
@@ -238,24 +268,24 @@ export default function ControlRoom() {
             </div>
           ))}
         </div>
-        <div className="mt-2 flex flex-wrap gap-4 text-[11px] text-ink-2">
+        )}
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-2">
           <span className="inline-flex items-center gap-1"><i className="inline-block h-2 w-2.5 rounded-sm bg-ink-2" />Queued car</span>
           <span className="inline-flex items-center gap-1"><i className="inline-block h-2 w-2.5 rounded-sm bg-accent/75" />Moving car</span>
           <span className="inline-flex items-center gap-1"><i className="inline-block h-2 w-2.5 rounded-sm bg-c-geo" />Side-street car</span>
           <span className="inline-flex items-center gap-1"><i className="inline-block size-2 rounded-full bg-good" />Main green · <i className="inline-block size-2 rounded-full bg-critical" />Side green</span>
-          <span>Bar under each link: how full the road ahead is</span>
         </div>
       </Card>
 
       <Card title="Live scoreboard" hint="Since the last restart · best value in each row marked ✓">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+          <table className="w-full border-collapse text-xs sm:text-[13px]">
             <thead>
               <tr className="text-left text-xs text-ink-2">
                 <th className="border-b border-gridline py-1.5 pr-2 font-semibold">Metric</th>
                 {CONTROLLERS.map(c => (
-                  <th key={c.key} className="border-b border-gridline px-2 py-1.5 text-right font-semibold">
-                    <span className="inline-flex items-center gap-1.5"><i className="inline-block size-2.5 rounded-full" style={{ background: CTRL_COLOR[c.key] }} />{c.label}</span>
+                  <th key={c.key} className="border-b border-gridline px-1.5 py-1.5 text-right font-semibold sm:px-2">
+                    <span className="inline-flex items-center gap-1.5"><i className="inline-block size-2.5 rounded-full" style={{ background: CTRL_COLOR[c.key] }} /><span className="sm:hidden">{CTRL_SHORT[c.key]}</span><span className="hidden sm:inline">{c.label}</span></span>
                   </th>
                 ))}
               </tr>
@@ -268,7 +298,7 @@ export default function ControlRoom() {
                   <tr key={m.key}>
                     <td className="border-b border-gridline py-1.5 pr-2 text-ink-2">{m.label}{m.unit && <span className="text-muted"> ({m.unit})</span>}</td>
                     {vals.map((v, i) => (
-                      <td key={i} className={`border-b border-gridline px-2 py-1.5 text-right tabular-nums ${v === best && t > 60 ? 'font-bold' : ''}`}>
+                      <td key={i} className={`whitespace-nowrap border-b border-gridline px-1.5 py-1.5 text-right tabular-nums sm:px-2 ${v === best && t > 60 ? 'font-bold' : ''}`}>
                         {m.fmt(v)} {v === best && t > 60 ? '✓' : ''}
                       </td>
                     ))}

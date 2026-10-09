@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTooltip } from './Tooltip'
 
 /* eslint-disable react-refresh/only-export-components */
-export function useWidth(initial = 600) {
+export function useWidth(initial = 320) {
   const ref = useRef(null)
   const [w, setW] = useState(initial)
   useEffect(() => {
@@ -41,6 +41,8 @@ export default function LineChart({
   const top = Math.ceil(raw / stepY) * stepY
   const X = x => M.l + ((x - x0) / (x1 - x0)) * (W - M.l - M.r)
   const Y = y => height - M.b - (y / top) * (height - M.t - M.b)
+  // Drop x labels that would collide on narrow screens (keep >= 44 px between labels).
+  const shownXTicks = xTicks.reduce((acc, t) => (acc.length && X(t.v) - X(acc.at(-1).v) < 44 ? acc : [...acc, t]), [])
   const yTicks = Array.from({ length: Math.round(top / stepY) + 1 }, (_, i) => i * stepY)
   const path = pts => pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.x).toFixed(1)} ${Y(p.y).toFixed(1)}`).join(' ')
   const xs = series[0]?.points.map(p => p.x) ?? []
@@ -64,7 +66,7 @@ export default function LineChart({
   }
 
   return (
-    <div ref={ref}>
+    <div ref={ref} className="w-full min-w-0">
       <svg width={W} height={height} viewBox={`0 0 ${W} ${height}`} role="img" aria-label={ariaLabel} className="block">
         {bands.map(b => (
           <g key={b.label}>
@@ -78,7 +80,7 @@ export default function LineChart({
             <text x={M.l - 6} y={Y(v) + 4} textAnchor="end" fontSize="11" fill="var(--color-muted)" className="tabular-nums">{yFormat(v)}</text>
           </g>
         ))}
-        {xTicks.map(t => (
+        {shownXTicks.map(t => (
           <text key={t.v} x={X(t.v)} y={height - 6} textAnchor="middle" fontSize="11" fill="var(--color-muted)">{t.label}</text>
         ))}
         {series.map(s => (
