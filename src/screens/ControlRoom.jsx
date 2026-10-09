@@ -144,18 +144,31 @@ export default function ControlRoom() {
     setExplain(null)
   }, [])
 
+  const viewRef = useRef(view)
+  useEffect(() => { viewRef.current = view })
+  // The 3D view scales car acceleration to the simulation speed; it reads it through a stable getter.
+  const speedRef = useRef(speed)
+  useEffect(() => { speedRef.current = speed })
+  const getSpeed = useCallback(() => speedRef.current, [])
+
   useEffect(() => {
     if (!running) return
     let raf
     let last = performance.now()
-    let acc = 0
+    let lastUi = 0
+    let acc = world.frac ?? 0
     const loop = now => {
       acc += ((now - last) / 1000) * speed
       last = now
       const n = Math.min(240, Math.floor(acc))
-      acc -= n
+      acc = Math.min(acc - n, 0.999)
       for (let i = 0; i < n; i++) world.sims.forEach(s => step(s, world.stream, liveRef.current))
-      if (n) setFrame(f => f + 1)
+      world.frac = acc // the 3D view interpolates moving cars between whole simulated seconds
+      // The 3D scene animates itself every frame; the text around it only needs ~8 updates a second.
+      if (n && (viewRef.current === '2d' || now - lastUi > 120)) {
+        lastUi = now
+        setFrame(f => f + 1)
+      }
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -246,7 +259,7 @@ export default function ControlRoom() {
               ))}
             </div>
             <Suspense fallback={<div className="grid h-[380px] place-items-center rounded-lg bg-land text-xs text-muted">Loading 3D view…</div>}>
-              <Corridor3D world={world} names={corridor.junctions} highlight={explain ? explain.j : null} />
+              <Corridor3D world={world} getSpeed={getSpeed} names={corridor.junctions} highlight={explain ? explain.j : null} />
             </Suspense>
             {ex && <p className="rounded-md bg-critical/8 px-2 py-1 text-[13px]"><b>Local adaptive:</b> {ex.ad}</p>}
             {ex && <p className="rounded-md bg-accent/8 px-2 py-1 text-[13px]"><b>FlowGuard:</b> {ex.fg}</p>}

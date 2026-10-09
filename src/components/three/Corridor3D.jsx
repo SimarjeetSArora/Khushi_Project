@@ -2,6 +2,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { memo, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { CONTROLLERS, JUNCTIONS, P, occupancy } from '../../engine/corridor'
+import { CORRIDOR_CAR } from './carGeometry'
 import { C3, Controls, FitCamera, Label3D } from './common'
 
 // World layout: each corridor runs along x; the three controllers sit side by side along z.
@@ -9,30 +10,33 @@ const JX = [-27, 3, 33]
 const ENTRY = -48
 const EXIT = 48.5
 const LANE_Z = [-13, 0, 13]
-const CAR = 1.2 // spacing between queued cars
+const CAR = 1.55 // spacing between queued cars (cars are 1.3 long)
 const MAX_Q = 140
-const MAX_MOVE = 70
-const MAX_SIDE = 24
+const MAX_MOVE = 90
+const MAX_SIDE = 30
+// Car motion is physical: each drawn car has a speed, accelerates gently up to a top speed, brakes
+// smoothly into its spot, and never teleports. All rates scale with the simulation speed (1× / 10× / 60×).
+const FREE_FLOW = 1.2 // world units per simulated second (≈ link length / free-flow time)
+const ACCEL_TIME = 0.35 // real seconds to reach top speed, never shorter even at 60×
+const GHOST_LIFE = 0.8 // real seconds a departing car keeps driving before it fades out
+const GHOST_DIST = 7 // …or until it has driven this far (just across the junction / past signal D)
 
 const LANDSCAPE = [0, 40, 44]
 const PORTRAIT = [0, 122, 26]
 
 const tmp = new THREE.Object3D()
-const hide = (mesh, from) => {
-  tmp.position.set(0, -50, 0)
-  tmp.scale.set(0, 0, 0)
-  tmp.updateMatrix()
-  for (let i = from; i < mesh.count; i++) mesh.setMatrixAt(i, tmp.matrix)
-}
-const put = (mesh, i, x, y, z, rotY = 0) => {
+const put = (mesh, i, x, y, z, rotY = 0, scale = 1) => {
   tmp.position.set(x, y, z)
   tmp.rotation.set(0, rotY, 0)
-  tmp.scale.set(1, 1, 1)
+  tmp.scale.setScalar(scale)
   tmp.updateMatrix()
   mesh.setMatrixAt(i, tmp.matrix)
 }
 
-function Lane({ sim, z, label, color, names, showNames, highlight, portrait }) {
+// kind: 0 queued (grey), 1 moving (blue), 2 side street (green)
+const KIND_MAX = [MAX_Q, MAX_MOVE, MAX_SIDE]
+
+function Lane({ sim, frac, simSpeed, z, label, color, names, showNames, highlight, portrait }) {
   const lh = portrait ? 3.8 : 2.4 // label height in world units
   const queued = useRef()
   const moving = useRef()
@@ -41,45 +45,103 @@ function Lane({ sim, z, label, color, names, showNames, highlight, portrait }) {
   const blocks = useRef([])
   const fills = useRef([])
   const exitLight = useRef()
+  const disp = useRef(new Map()) // vehicle → where it is drawn now
+  const ghosts = useRef([]) // vehicles that just left the simulation, driving off
 
   const fillMats = useMemo(() => [0, 1, 2].map(() => new THREE.MeshStandardMaterial({ color: C3.good })), [])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, rawDt) => {
     const s = sim()
     if (!s || !queued.current) return
-    // queued cars at each stop line, plus the downstream queue at D
-    let qi = 0
+    const dt = Math.min(rawDt, 0.05)
+    const t = s.t + frac() // fractional sim time, so moving cars advance between steps
+    const sp = simSpeed() // simulated seconds per real second
+    const cruise = FREE_FLOW * sp // normal driving speed, world units per real second
+    const vmax = Math.max(2.5, 1.5 * cruise) // allows catching up after a stop
+    const accel = vmax / Math.max(ACCEL_TIME, 3 / sp)
+    const brake = 1 / Math.max(0.18, 1.2 / sp) // how early a car eases off before its spot
+    const colorAt = 0.4 * cruise // grey ↔ blue switches at this speed, so colour follows motion
+
+    // Where each vehicle should be right now: [vehicle, x, z, rotation, kind, enteringCorridor]
+    const targets = []
     JX.forEach((x, j) => {
       const prev = j === 0 ? ENTRY : JX[j - 1] + 1.6
       const room = Math.floor((x - 1.6 - prev) / CAR)
-      const n = Math.min(s.mainQ[j].length, room)
-      for (let i = 0; i < n && qi < MAX_Q; i++) put(queued.current, qi++, x - 1.6 - (i + 0.5) * CAR, 0.32, z + 0.6)
+      const q = s.mainQ[j]
+      for (let i = 0; i < Math.min(q.length, room); i++) targets.push([q[i], x - 1.6 - (i + 0.5) * CAR, z + 0.6, 0, 0, j === 0])
     })
-    for (let i = 0; i < Math.min(s.exitQ.length, 12) && qi < MAX_Q; i++) put(queued.current, qi++, EXIT - 1.2 - (i + 0.5) * CAR, 0.32, z + 0.6)
-    hide(queued.current, qi)
-    queued.current.instanceMatrix.needsUpdate = true
-
-    // cars moving along each link
-    let mi = 0
+    for (let i = 0; i < Math.min(s.exitQ.length, 9); i++) targets.push([s.exitQ[i], EXIT - 1.2 - (i + 0.5) * CAR, z + 0.6, 0, 0, false])
     s.link.forEach((l, j) => {
       const start = JX[j] + 1.6
-      const tail = (j < 2 ? JX[j + 1] - 1.6 : EXIT - 1.2) - (j < 2 ? s.mainQ[j + 1].length : s.exitQ.length) * CAR - 1
+      const end = j < 2 ? JX[j + 1] - 1.6 : EXIT - 1.2
+      // Cars on a link line up behind the queue ahead, one car-length apart (the link is ordered front first).
+      let limit = end - ((j < 2 ? s.mainQ[j + 1].length : s.exitQ.length) + 0.5) * CAR
       l.forEach(c => {
-        if (mi >= MAX_MOVE) return
-        const prog = Math.min(1, Math.max(0, 1 - (c.at - s.t) / P.freeFlow[j]))
-        put(moving.current, mi++, start + prog * Math.max(0, tail - start), 0.32, z + 0.6)
+        const prog = Math.min(1, Math.max(0, 1 - (c.at - t) / P.freeFlow[j]))
+        const x = Math.max(start, Math.min(start + prog * (end - start), limit))
+        limit = x - CAR
+        targets.push([c.v, x, z + 0.6, 0, 1, false])
       })
     })
-    hide(moving.current, mi)
-    moving.current.instanceMatrix.needsUpdate = true
-
-    // side-street queues on the cross streets
-    let si = 0
     JX.forEach((x, j) => {
-      for (let i = 0; i < Math.min(s.sideQ[j].length, 8) && si < MAX_SIDE; i++) put(side.current, si++, x + 0.5, 0.32, z + 2.4 + i * CAR, Math.PI / 2)
+      const q = s.sideQ[j]
+      for (let i = 0; i < Math.min(q.length, 6); i++) targets.push([q[i], x + 0.5, z + 2.4 + i * CAR, Math.PI / 2, 2, false])
     })
-    hide(side.current, si)
-    side.current.instanceMatrix.needsUpdate = true
+
+    const meshes = [queued.current, moving.current, side.current]
+    const count = [0, 0, 0]
+    const seen = new Set()
+    for (const [v, tx, tz, rot, kind, entering] of targets) {
+      seen.add(v)
+      let d = disp.current.get(v)
+      if (!d) {
+        // New cars arrive already rolling: from the corridor start, or down the side street.
+        const rolling = entering || kind === 2
+        d = { x: entering ? ENTRY - 3 : tx, z: kind === 2 ? tz + 3 : tz, v: rolling ? Math.min(vmax, cruise) : 0, rot, drawn: kind }
+        disp.current.set(v, d)
+      }
+      const dx = tx - d.x
+      const dz = tz - d.z
+      const dist = Math.hypot(dx, dz)
+      const want = Math.min(vmax, dist * brake)
+      d.v += Math.max(-2 * accel * dt, Math.min(accel * dt, want - d.v))
+      const move = Math.min(dist, Math.max(0, d.v) * dt)
+      if (dist > 1e-4) {
+        d.x += (dx / dist) * move
+        d.z += (dz / dist) * move
+      }
+      d.rot = rot
+      // Colour follows what the car is visibly doing, not the instant the simulation reassigns it.
+      if (kind === 2) d.drawn = 2
+      else if (kind === 1 && d.v > colorAt) d.drawn = 1
+      else if (kind === 0 && d.v < colorAt) d.drawn = 0
+      else if (d.drawn === 2) d.drawn = kind
+      const k = d.drawn
+      if (count[k] < KIND_MAX[k]) put(meshes[k], count[k]++, d.x, 0.02, d.z, rot)
+    }
+    // Vehicles that left the simulation keep driving (side cars across the corridor, main cars past D).
+    for (const [v, d] of disp.current) {
+      if (!seen.has(v)) {
+        disp.current.delete(v)
+        ghosts.current.push({ ...d, v: Math.max(d.v, 0.8 * Math.min(vmax, cruise)), age: 0 })
+      }
+    }
+    ghosts.current = ghosts.current.filter(g => (g.age += dt) < GHOST_LIFE && (g.dist ?? 0) < GHOST_DIST)
+    for (const g of ghosts.current) {
+      g.v = Math.min(vmax, g.v + accel * dt)
+      const stepLen = g.v * dt
+      g.dist = (g.dist ?? 0) + stepLen
+      if (g.drawn === 2) g.z -= stepLen
+      else g.x += stepLen
+      const k = g.drawn === 2 ? 2 : 1
+      const fade = Math.min(1, (GHOST_LIFE - g.age) / 0.3, (GHOST_DIST - g.dist) / 2.5)
+      if (count[k] < KIND_MAX[k]) put(meshes[k], count[k]++, g.x, 0.02, g.z, g.rot, fade)
+    }
+    // Draw only the cars that exist this frame (unused slots cost nothing).
+    meshes.forEach((m, k) => {
+      m.count = count[k]
+      m.instanceMatrix.needsUpdate = true
+    })
 
     // signals, blocked boxes, storage bars
     const pulse = 0.35 + 0.25 * Math.sin(clock.elapsedTime * 8)
@@ -127,16 +189,16 @@ function Lane({ sim, z, label, color, names, showNames, highlight, portrait }) {
       ))}
       {/* cars */}
       <instancedMesh ref={queued} args={[null, null, MAX_Q]} frustumCulled={false}>
-        <boxGeometry args={[0.95, 0.55, 0.75]} />
-        <meshStandardMaterial color={C3.ink2} />
+        <primitive object={CORRIDOR_CAR} attach="geometry" />
+        <meshStandardMaterial color={C3.ink2} vertexColors />
       </instancedMesh>
       <instancedMesh ref={moving} args={[null, null, MAX_MOVE]} frustumCulled={false}>
-        <boxGeometry args={[0.95, 0.55, 0.75]} />
-        <meshStandardMaterial color={C3.accent} />
+        <primitive object={CORRIDOR_CAR} attach="geometry" />
+        <meshStandardMaterial color={C3.accent} vertexColors />
       </instancedMesh>
       <instancedMesh ref={side} args={[null, null, MAX_SIDE]} frustumCulled={false}>
-        <boxGeometry args={[0.95, 0.55, 0.75]} />
-        <meshStandardMaterial color={C3.geo} />
+        <primitive object={CORRIDOR_CAR} attach="geometry" />
+        <meshStandardMaterial color={C3.geo} vertexColors />
       </instancedMesh>
       {/* signal poles */}
       {JX.map((x, j) => (
@@ -197,7 +259,7 @@ function Lane({ sim, z, label, color, names, showNames, highlight, portrait }) {
   )
 }
 
-function Scene({ world, names, highlight }) {
+function Scene({ world, getSpeed, names, highlight }) {
   const { size } = useThree()
   const portrait = size.width / size.height < 1
   return (
@@ -213,6 +275,8 @@ function Scene({ world, names, highlight }) {
           <Lane
             key={c.key}
             sim={() => world.sims[i]}
+            frac={() => world.frac ?? 0}
+            simSpeed={getSpeed}
             z={LANE_Z[i]}
             label={c.label}
             color={c.key === 'fixed' ? C3.muted : c.key === 'adaptive' ? C3.sig : C3.accent}
@@ -229,11 +293,11 @@ function Scene({ world, names, highlight }) {
   )
 }
 
-const Corridor3D = memo(function Corridor3D({ world, names, highlight = null }) {
+const Corridor3D = memo(function Corridor3D({ world, getSpeed, names, highlight = null }) {
   return (
     <div className="h-[460px] w-full overflow-hidden rounded-lg bg-land sm:h-[440px] lg:h-[480px]" aria-label="3D view of the three corridors" role="img">
-      <Canvas flat camera={{ fov: 42, position: LANDSCAPE }} dpr={[1, 2]}>
-        <Scene world={world} names={names} highlight={highlight} />
+      <Canvas flat camera={{ fov: 42, position: LANDSCAPE }} dpr={[1, 1.5]}>
+        <Scene world={world} getSpeed={getSpeed} names={names} highlight={highlight} />
       </Canvas>
     </div>
   )

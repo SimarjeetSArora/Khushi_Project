@@ -2,6 +2,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { memo, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { corridorTrip } from '../../engine/closure'
+import { MAP_CAR } from './carGeometry'
 import { C3, Controls, FitCamera, Label3D } from './common'
 
 // Gentle hills ("ghat" feel) — deterministic, no randomness.
@@ -53,33 +54,44 @@ function Route({ curve, color, radius, opacity = 1 }) {
 }
 
 // Cars flowing along a route: count follows the share of traffic, speed follows congestion.
-function Flow({ curve, count, speed, color, max = 70 }) {
+// `lift` = radius of the route tube, so cars drive on top of it rather than inside it.
+function Flow({ curve, count, speed, color, lift = 0.3, max = 70 }) {
   const ref = useRef()
   const tmp = useMemo(() => new THREE.Object3D(), [])
-  const offsets = useMemo(() => Array.from({ length: max }, (_, i) => (i * 0.6180339) % 1), [max])
-  useFrame(({ clock }) => {
+  // Each car keeps its own progress along the route; integrating speed (rather than time × speed)
+  // means changing the split never makes cars jump.
+  const progress = useRef(Array.from({ length: max }, (_, i) => (i * 0.6180339) % 1))
+  // Cars grow in / shrink out when the split changes, and speed and height ease to new values,
+  // so nothing pops or lurches.
+  const scales = useRef(new Array(max).fill(0))
+  const eased = useRef({ speed, lift })
+  useFrame((_, rawDt) => {
     if (!ref.current) return
+    const dt = Math.min(rawDt, 0.05)
+    const ease = 1 - Math.exp(-dt * 2.5)
+    eased.current.speed += (speed - eased.current.speed) * ease
+    eased.current.lift += (lift - eased.current.lift) * ease
+    const grow = 1 - Math.exp(-dt * 5)
+    let drawn = 0
     for (let i = 0; i < max; i++) {
-      if (i < count) {
-        const t = (offsets[i] + clock.elapsedTime * speed) % 1
-        const p = curve.getPointAt(t)
-        const d = curve.getTangentAt(t)
-        tmp.position.set(p.x, p.y + 0.22, p.z)
-        tmp.rotation.set(0, Math.atan2(-d.z, d.x), 0)
-        tmp.scale.set(1, 1, 1)
-      } else {
-        tmp.position.set(0, -20, 0)
-        tmp.scale.set(0, 0, 0)
-      }
+      const sc = (scales.current[i] += ((i < count ? 1 : 0) - scales.current[i]) * grow)
+      if (sc < 0.02) continue
+      const t = (progress.current[i] = (progress.current[i] + dt * eased.current.speed) % 1)
+      const p = curve.getPointAt(t)
+      const d = curve.getTangentAt(t)
+      tmp.position.set(p.x, p.y + eased.current.lift * 0.85, p.z)
+      tmp.rotation.set(0, Math.atan2(-d.z, d.x), 0)
+      tmp.scale.setScalar(sc)
       tmp.updateMatrix()
-      ref.current.setMatrixAt(i, tmp.matrix)
+      ref.current.setMatrixAt(drawn++, tmp.matrix)
     }
+    ref.current.count = drawn // draw only the cars in use
     ref.current.instanceMatrix.needsUpdate = true
   })
   return (
     <instancedMesh ref={ref} args={[null, null, max]} frustumCulled={false}>
-      <boxGeometry args={[0.7, 0.4, 0.45]} />
-      <meshStandardMaterial color={color} />
+      <primitive object={MAP_CAR} attach="geometry" />
+      <meshStandardMaterial color={color} vertexColors />
     </instancedMesh>
   )
 }
@@ -112,6 +124,8 @@ function Scene({ ev, split, statusKey }) {
   const total = 70
   // Corridor slows as its share grows (same curve as the trade-off chart).
   const corridorSpeed = 0.05 * (14 / corridorTrip(split))
+  const rCorridor = 0.18 + 0.55 * (active ? split : 0.1)
+  const rBypass = 0.18 + 0.55 * (active ? 1 - split : 0.1)
   const barrierPts = [0.42, 0.5, 0.58].map(t => curves.closed.getPointAt(t))
 
   return (
@@ -121,18 +135,18 @@ function Scene({ ev, split, statusKey }) {
       <Terrain />
 
       <Route curve={curves.closed} color={active ? C3.critical : upcoming ? C3.warning : C3.roadMajor} radius={0.35} opacity={active ? 0.75 : 1} />
-      <Route curve={curves.corridor} color={C3.accent} radius={0.18 + 0.55 * (active ? split : 0.1)} />
-      <Route curve={curves.bypass} color={C3.geo} radius={0.18 + 0.55 * (active ? 1 - split : 0.1)} />
+      <Route curve={curves.corridor} color={C3.accent} radius={rCorridor} />
+      <Route curve={curves.bypass} color={C3.geo} radius={rBypass} />
 
       {active && barrierPts.map((p, i) => <Barrier key={i} position={[p.x, p.y - 0.2, p.z]} />)}
 
       {active ? (
         <>
-          <Flow curve={curves.corridor} count={Math.round(total * split)} speed={corridorSpeed} color={C3.ink2} />
-          <Flow curve={curves.bypass} count={Math.round(total * (1 - split))} speed={0.045} color={C3.ink2} />
+          <Flow curve={curves.corridor} count={Math.round(total * split)} speed={corridorSpeed} color={C3.lane} lift={rCorridor} />
+          <Flow curve={curves.bypass} count={Math.round(total * (1 - split))} speed={0.045} color={C3.lane} lift={rBypass} />
         </>
       ) : (
-        <Flow curve={curves.closed} count={upcoming || !ev ? 40 : 30} speed={0.07} color={C3.ink2} />
+        <Flow curve={curves.closed} count={upcoming || !ev ? 40 : 30} speed={0.07} color={C3.lane} lift={0.35} />
       )}
 
       {JUNCTION_T.map((t, i) => {
@@ -172,7 +186,7 @@ function Scene({ ev, split, statusKey }) {
 const DiversionMap3D = memo(function DiversionMap3D({ ev, split, statusKey }) {
   return (
     <div className="h-[320px] w-full overflow-hidden rounded-lg bg-land sm:h-[380px]" role="img" aria-label="3D map of the closure, corridor and bypass">
-      <Canvas flat camera={{ fov: 40, position: LANDSCAPE }} dpr={[1, 2]}>
+      <Canvas flat camera={{ fov: 40, position: LANDSCAPE }} dpr={[1, 1.5]}>
         <Scene ev={ev} split={split} statusKey={statusKey} />
       </Canvas>
     </div>
