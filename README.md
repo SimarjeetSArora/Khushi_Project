@@ -1,16 +1,35 @@
-# React + Vite
+# FlowGuard — Round 3 demo
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+One simulated forecast engine driving five dashboards. Every number is simulated and uncalibrated;
+nothing connects to Mappls.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```
+npm install
+npm run dev          # http://localhost:5173
+npm run build        # static copy in dist/ — serve it with `npm run preview` (works offline)
+npm run experiments  # re-runs the 20-seed experiment → src/engine/results.json
+```
 
-## React Compiler
+## Dashboards (tabs)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. **Corridor Control Room**: fixed timer vs local adaptive vs FlowGuard on the same cars (seed 1000).
+2. **Disruption Console**: load the Missing Link (unplanned) or Kolkata Puja (planned) event, drag the split, approve an option.
+3. **Fleet Delivery-Risk**: sample orders flip to at risk / will miss from the same event.
+4. **Commuter ETA**: phone mock-up, last-trip estimate vs FlowGuard forecast, departure advice.
+5. **Pilot Impact**: 20-seed results, pilot gates, empty before/after panel for real data.
 
-## Expanding the Oxlint configuration
+A loaded event is shared state (`src/engine/store.jsx`), so it shows up on every tab at once.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Where to change things
+
+| What | File |
+|---|---|
+| Corridor engine, controllers, scenario demand | `src/engine/corridor.js` |
+| Event cards (names, times, volumes) | `src/engine/events.js` |
+| Diversion curves and options | `src/engine/closure.js` |
+| Delivery orders, restriction calendar | `src/engine/fleet.js` |
+| Pilot gates | `src/screens/PilotImpact.jsx` |
+
+After changing `corridor.js`, run `npm run experiments` so the Pilot Impact and Commuter numbers update.

@@ -1,120 +1,101 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import BeforeAfter from './components/BeforeAfter'
-import BottleneckMap from './components/BottleneckMap'
-import Header from './components/Header'
-import HotspotDetail from './components/HotspotDetail'
-import HotspotList from './components/HotspotList'
-import IncidentLoop from './components/IncidentLoop'
-import TicketDialog from './components/TicketDialog'
+import { useEffect, useState } from 'react'
 import { TooltipProvider } from './components/Tooltip'
-import { HOTSPOTS, TIMELINE } from './data'
+import { Button, EVENT_STATUS, SimTag, StatusChip } from './components/ui'
+import { clockLabel } from './engine/events'
+import { DemoProvider, useDemo } from './engine/store'
+import CommuterView from './screens/CommuterView'
+import ControlRoom from './screens/ControlRoom'
+import DisruptionConsole from './screens/DisruptionConsole'
+import FleetBoard from './screens/FleetBoard'
+import PilotImpact from './screens/PilotImpact'
 
-// Open the app with #preview to jump to the end state of the demo (handy for rehearsal).
-const PREVIEW = typeof window !== 'undefined' && window.location.hash === '#preview'
+const TABS = [
+  { id: 'control', label: 'Corridor Control Room', who: 'Traffic engineers', Screen: ControlRoom },
+  { id: 'console', label: 'Disruption Console', who: 'Traffic police', Screen: DisruptionConsole },
+  { id: 'fleet', label: 'Fleet Delivery-Risk', who: 'Delivery operators', Screen: FleetBoard },
+  { id: 'commuter', label: 'Commuter ETA', who: 'Drivers', Screen: CommuterView },
+  { id: 'impact', label: 'Pilot Impact', who: 'Mappls & city', Screen: PilotImpact },
+]
 
-export default function App() {
-  const [selId, setSelId] = useState(PREVIEW ? HOTSPOTS[0].id : null)
-  const [tickets, setTickets] = useState(PREVIEW ? { silk: { status: 'fixed', ...HOTSPOTS[0].fix, no: 'RP-1041' } } : {}) // id -> ticket
-  const [ticketNo, setTicketNo] = useState(PREVIEW ? 1041 : 1040)
-  const [dialogHs, setDialogHs] = useState(null)
-  const [incident, setIncident] = useState(PREVIEW ? 2 : 0) // 0 none · 1 live · 2 rerouted
-  const [step, setStep] = useState(PREVIEW ? TIMELINE.length : 0)
-  const [alertOpen, setAlertOpen] = useState(false)
-  const [done, setDone] = useState(() => new Set(PREVIEW ? [1, 2, 3, 4, 5] : []))
-  const timers = useRef([])
+const tabFromHash = () => TABS.find(t => `#/${t.id}` === window.location.hash)?.id ?? 'control'
 
-  const markStep = useCallback(n => setDone(d => new Set(d).add(n)), [])
-  const hs = HOTSPOTS.find(h => h.id === selId)
+function EventIndicator() {
+  const { ev, status, clock, playing, dispatch } = useDemo()
+  if (!ev) return <span className="text-xs text-muted">No event loaded</span>
+  const st = EVENT_STATUS[status.key]
+  return (
+    <div className="flex items-center gap-2">
+      <StatusChip color={st.color} icon={st.icon} label={`${status.label}: ${ev.city} ${ev.kind.toLowerCase()} closure`} />
+      <span className="text-xs tabular-nums text-ink-2">{clockLabel(clock)}</span>
+      <Button size="sm" variant="ghost" onClick={() => dispatch({ type: 'play', playing: !playing })} aria-label={playing ? 'Pause demo clock' : 'Run demo clock'}>
+        {playing ? '❚❚' : '▶'}
+      </Button>
+    </div>
+  )
+}
 
-  const select = id => {
-    setSelId(id)
-    const h = HOTSPOTS.find(x => x.id === id)
-    if (id === HOTSPOTS[0].id) markStep(1)
-    if (h.main !== 'sig' && h.causes.mid > h.causes.sig) markStep(2)
-  }
-
-  const createTicket = (id, form) => {
-    const no = ticketNo + 1
-    setTicketNo(no)
-    setTickets(t => ({ ...t, [id]: { status: 'open', ...form, no: `RP-${no}` } }))
-    setDialogHs(null)
-    markStep(3)
-  }
-
-  const markFixed = id => {
-    setTickets(t => ({ ...t, [id]: { ...t[id], status: 'fixed' } }))
-    setSelId(id)
-    markStep(4)
-  }
-
-  const triggerIncident = () => {
-    setIncident(1)
-    markStep(5)
-    TIMELINE.forEach((_, i) => {
-      timers.current.push(
-        setTimeout(() => {
-          setStep(i + 1)
-          if (i === TIMELINE.length - 1) setAlertOpen(true)
-        }, 300 + i * 900),
-      )
-    })
-  }
-
-  const clearTimers = () => {
-    timers.current.forEach(clearTimeout)
-    timers.current = []
-  }
-  useEffect(() => clearTimers, [])
-
-  const reset = () => {
-    clearTimers()
-    setSelId(null)
-    setTickets({})
-    setTicketNo(1040)
-    setIncident(0)
-    setStep(0)
-    setAlertOpen(false)
-    setDone(new Set())
-    if (window.location.hash) history.replaceState(null, '', window.location.pathname)
-  }
+function Shell() {
+  const [tab, setTab] = useState(tabFromHash)
+  const { dispatch } = useDemo()
+  useEffect(() => {
+    const on = () => setTab(tabFromHash())
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
+  const { Screen } = TABS.find(t => t.id === tab)
 
   return (
-    <TooltipProvider>
-      <Header done={done} onReset={reset} />
-
-      <main className="mx-auto grid max-w-[1600px] gap-4 px-4 pb-8 pt-4 sm:px-5">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_380px]">
-          <HotspotList selId={selId} onSelect={select} />
-          <BottleneckMap selId={selId} onSelect={select} tickets={tickets} incident={incident} />
-          <HotspotDetail
-            hs={hs}
-            ticket={hs && tickets[hs.id]}
-            onSelect={select}
-            onCreateTicket={setDialogHs}
-            className="md:col-span-2 xl:col-span-1"
-          />
+    <>
+      <header className="sticky top-0 z-20 border-b border-black/10 bg-surface">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-4 gap-y-2 px-4 pt-2.5 sm:px-5">
+          <div className="flex items-center gap-2.5">
+            <div className="grid size-7 place-items-center rounded-lg bg-accent" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 16 16"><path d="M1 12 L5 6 L8 9 L11 3 L15 8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </div>
+            <div>
+              <h1 className="text-[17px] font-bold tracking-tight">FlowGuard <span className="font-normal text-ink-2">· Round 3 demo</span></h1>
+              <div className="text-xs text-ink-2">One forecast engine · five dashboards · no live Mappls connection</div>
+            </div>
+            <SimTag>⚠ Simulated data</SimTag>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <EventIndicator />
+            <Button size="sm" onClick={() => dispatch({ type: 'reset' })}>↺ Reset demo</Button>
+          </div>
         </div>
+        <nav aria-label="Dashboards" className="mx-auto flex max-w-[1600px] gap-1 overflow-x-auto px-4 sm:px-5">
+          {TABS.map((t, i) => (
+            <a
+              key={t.id}
+              href={`#/${t.id}`}
+              aria-current={tab === t.id ? 'page' : undefined}
+              className={`whitespace-nowrap border-b-2 px-3 py-2 text-[13px] ${tab === t.id ? 'border-accent font-semibold text-ink' : 'border-transparent text-ink-2 hover:text-ink'}`}
+            >
+              <span className="mr-1.5 tabular-nums text-muted">{i + 1}</span>{t.label}
+              <span className="ml-1.5 hidden text-[11px] text-muted lg:inline">· {t.who}</span>
+            </a>
+          ))}
+        </nav>
+      </header>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_460px]">
-          <BeforeAfter hs={hs || HOTSPOTS[0]} tickets={tickets} onMarkFixed={markFixed} />
-          <IncidentLoop
-            incident={incident}
-            step={step}
-            alertOpen={alertOpen}
-            onTrigger={triggerIncident}
-            onReroute={() => { setIncident(2); setAlertOpen(false) }}
-            onIgnore={() => setAlertOpen(false)}
-          />
-        </div>
+      <main className="mx-auto max-w-[1600px] px-4 pb-8 pt-4 sm:px-5">
+        <Screen />
       </main>
 
       <footer className="mx-auto max-w-[1600px] px-4 pb-6 text-[11.5px] text-muted sm:px-5">
-        All figures are <b>simulated</b> for demonstration and are not measurements. Place names are real; positions are schematic.
-        Assumption used for “after” curves: a completed fix removes ~55% of the delay component it targets.
-        Cause classification would come from probe speeds plus street imagery and must be checked on the ground.
+        All figures are simulated by a simplified engine built for this demo and are uncalibrated. Event cards are written from real events; FlowGuard was not used in them.
+        Delivery orders are sample data; bypass and approach times are assumed.
       </footer>
+    </>
+  )
+}
 
-      <TicketDialog key={dialogHs?.id ?? 'none'} hs={dialogHs} onClose={() => setDialogHs(null)} onSubmit={createTicket} />
-    </TooltipProvider>
+export default function App() {
+  return (
+    <DemoProvider>
+      <TooltipProvider>
+        <Shell />
+      </TooltipProvider>
+    </DemoProvider>
   )
 }

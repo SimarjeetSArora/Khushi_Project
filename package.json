@@ -1,5 +1,5 @@
 {
-  "name": "roadpulse-react",
+  "name": "flowguard",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "experiments": "node scripts/experiments.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

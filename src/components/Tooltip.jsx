@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState } from 'react'
 
 const TooltipContext = createContext({ show: () => {}, hide: () => {} })
@@ -28,7 +29,7 @@ export function TooltipProvider({ children }) {
         ref={ref}
         role="tooltip"
         style={pos}
-        className={`pointer-events-none fixed z-50 max-w-64 rounded-lg border border-black/10 bg-surface px-2.5 py-1.5 text-xs shadow-lg transition-opacity duration-100 ${tip ? 'opacity-100' : 'opacity-0'}`}
+        className={`pointer-events-none fixed z-50 max-w-72 rounded-lg border border-black/10 bg-surface px-2.5 py-1.5 text-xs shadow-lg transition-opacity duration-100 ${tip ? 'opacity-100' : 'opacity-0'}`}
       >
         {tip?.content}
       </div>

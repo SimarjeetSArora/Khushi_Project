@@ -1,0 +1,145 @@
+{
+  "seeds": [
+    1000,
+    1019
+  ],
+  "generated": "2026-10-09",
+  "scenarios": {
+    "normal": {
+      "label": "Normal traffic",
+      "fixed": {
+        "delay": 59.5,
+        "vehHours": 28.2,
+        "tripAC": 147.9,
+        "spill": 51.3,
+        "wastedPerHour": 1041.7,
+        "sideMax": 54.1,
+        "etaNaive": 53.1,
+        "etaQA": 0
+      },
+      "adaptive": {
+        "delay": 14.9,
+        "vehHours": 7.1,
+        "tripAC": 70.9,
+        "spill": 26.2,
+        "wastedPerHour": 401.7,
+        "sideMax": 61.2,
+        "etaNaive": 9.5,
+        "etaQA": 9.8
+      },
+      "flowguard": {
+        "delay": 14.1,
+        "vehHours": 6.7,
+        "tripAC": 70.6,
+        "spill": 10.2,
+        "wastedPerHour": 27.5,
+        "sideMax": 47.3,
+        "etaNaive": 8.3,
+        "etaQA": 8.6
+      },
+      "savedVehHours": 0.4
+    },
+    "surge": {
+      "label": "Evening surge",
+      "fixed": {
+        "delay": 255.1,
+        "vehHours": 131.8,
+        "tripAC": 484.7,
+        "spill": 71,
+        "wastedPerHour": 1499,
+        "sideMax": 54.4,
+        "etaNaive": 97.9,
+        "etaQA": 0
+      },
+      "adaptive": {
+        "delay": 56.9,
+        "vehHours": 31.6,
+        "tripAC": 137.8,
+        "spill": 79.3,
+        "wastedPerHour": 2334.4,
+        "sideMax": 71.2,
+        "etaNaive": 28,
+        "etaQA": 17
+      },
+      "flowguard": {
+        "delay": 21.2,
+        "vehHours": 11.9,
+        "tripAC": 80,
+        "spill": 11.9,
+        "wastedPerHour": 36.5,
+        "sideMax": 60.2,
+        "etaNaive": 11.3,
+        "etaQA": 6.1
+      },
+      "savedVehHours": 19.7
+    },
+    "blocked": {
+      "label": "Downstream nearly blocked",
+      "fixed": {
+        "delay": 148.8,
+        "vehHours": 65.7,
+        "tripAC": 334.7,
+        "spill": 102.9,
+        "wastedPerHour": 2799,
+        "sideMax": 54.1,
+        "etaNaive": 64.6,
+        "etaQA": 0
+      },
+      "adaptive": {
+        "delay": 39.2,
+        "vehHours": 17.8,
+        "tripAC": 114.9,
+        "spill": 51,
+        "wastedPerHour": 2120.3,
+        "sideMax": 67.3,
+        "etaNaive": 22.5,
+        "etaQA": 10.4
+      },
+      "flowguard": {
+        "delay": 18,
+        "vehHours": 8.2,
+        "tripAC": 80.3,
+        "spill": 16.9,
+        "wastedPerHour": 55.3,
+        "sideMax": 43.4,
+        "etaNaive": 13.8,
+        "etaQA": 4.9
+      },
+      "savedVehHours": 9.6
+    },
+    "closure": {
+      "label": "Closure diversion",
+      "fixed": {
+        "delay": 262,
+        "vehHours": 130.4,
+        "tripAC": 487.4,
+        "spill": 72,
+        "wastedPerHour": 1570,
+        "sideMax": 54.3,
+        "etaNaive": 98.5,
+        "etaQA": 0
+      },
+      "adaptive": {
+        "delay": 57.4,
+        "vehHours": 30.6,
+        "tripAC": 137.8,
+        "spill": 78,
+        "wastedPerHour": 2531.2,
+        "sideMax": 70,
+        "etaNaive": 25.3,
+        "etaQA": 15
+      },
+      "flowguard": {
+        "delay": 21.3,
+        "vehHours": 11.5,
+        "tripAC": 80.3,
+        "spill": 12.6,
+        "wastedPerHour": 40.3,
+        "sideMax": 58.6,
+        "etaNaive": 11.9,
+        "etaQA": 5.3
+      },
+      "savedVehHours": 19.1
+    }
+  }
+}
