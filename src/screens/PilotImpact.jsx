@@ -10,17 +10,17 @@ const ORDER = ['normal', 'surge', 'blocked', 'closure']
 const GATES = [
   {
     phase: 'Phase 1 · Offline replay',
-    test: 'Replay 4 weeks of one corridor’s probe and signal logs through FlowGuard.',
+    test: 'Replay 4 weeks of one corridor’s probe and signal logs through RoadSync.',
     pass: 'Queue-aware ETA error beats the current ETA by ≥ 30% on real data; spillback detection agrees with engineers.',
   },
   {
     phase: 'Phase 2 · Shadow mode',
-    test: 'FlowGuard advises in the control room; engineers decide. No signal changes.',
+    test: 'RoadSync advises in the control room; engineers decide. No signal changes.',
     pass: '≥ 70% of advisories accepted; no advised plan raises the worst side-street wait above 120 s.',
   },
   {
     phase: 'Phase 3 · Live corridor pilot',
-    test: 'FlowGuard re-times one corridor in peak hours against matched control days.',
+    test: 'RoadSync re-times one corridor in peak hours against matched control days.',
     pass: 'Measured vehicle-hours saved > 0 on real data; no safety incidents; city agrees to renew.',
   },
 ]
@@ -41,7 +41,7 @@ function SavedBars() {
                 <>
                   <b>{s.label}</b><br />
                   Saved {s.savedVehHours} veh-h per corridor-hour<br />
-                  <span className="text-ink-2">Local adaptive {s.adaptive.vehHours} → FlowGuard {s.flowguard.vehHours} veh-h of waiting</span>
+                  <span className="text-ink-2">Local adaptive {s.adaptive.vehHours} → RoadSync {s.roadsync.vehHours} veh-h of waiting</span>
                 </>
               ))}
             >
@@ -61,14 +61,14 @@ export default function PilotImpact() {
   return (
     <div className="grid gap-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat value={`≈ ${surge.savedVehHours}`} label="Vehicle-hours saved per corridor-hour" sub="Evening surge, FlowGuard vs local adaptive" tone="good" />
-        <Stat value={`${Math.round(surge.adaptive.spill)} → ${Math.round(surge.flowguard.spill)}`} label="Spillback events per hour" sub="Evening surge" />
-        <Stat value={`${Math.round(surge.adaptive.sideMax)} → ${Math.round(surge.flowguard.sideMax)} s`} label="Worst side-street wait" sub="Evening surge" />
+        <Stat value={`≈ ${surge.savedVehHours}`} label="Vehicle-hours saved per corridor-hour" sub="Evening surge, RoadSync vs local adaptive" tone="good" />
+        <Stat value={`${Math.round(surge.adaptive.spill)} → ${Math.round(surge.roadsync.spill)}`} label="Spillback events per hour" sub="Evening surge" />
+        <Stat value={`${Math.round(surge.adaptive.sideMax)} → ${Math.round(surge.roadsync.sideMax)} s`} label="Worst side-street wait" sub="Evening surge" />
         <Stat value={`${Math.round(surge.adaptive.etaNaive)} → ${Math.round(surge.adaptive.etaQA)} s`} label="ETA error, A → C" sub="Last-trip estimate → queue-aware" />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Card title="Vehicle-hours saved by scenario" right={<SimTag>Simulated, uncalibrated</SimTag>} hint={`Per corridor-hour · mean of 20 seeds (${results.seeds[0]}–${results.seeds[1]}) · FlowGuard vs local adaptive`}>
+        <Card title="Vehicle-hours saved by scenario" right={<SimTag>Simulated, uncalibrated</SimTag>} hint={`Per corridor-hour · mean of 20 seeds (${results.seeds[0]}–${results.seeds[1]}) · RoadSync vs local adaptive`}>
           <SavedBars />
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[420px] border-collapse text-xs">

@@ -193,7 +193,7 @@ export default function ControlRoom() {
     const j = explain.j
     return {
       ad: `${JUNCTIONS[j]} · ${corridor.junctions[j]}: ${explain.blocked ? 'green, but the' : 'the'} road ahead holds ${occupancy(ad, j)}/${P.storage[j]} cars. ${explain.blocked ? 'Nobody can move, so this green is wasted while' : 'It will block soon, and meanwhile'} ${ad.sideQ[j].length} side-street car${ad.sideQ[j].length === 1 ? '' : 's'} wait${ad.sideQ[j].length === 1 ? 's' : ''}.`,
-      fg: `Same cars, same second. FlowGuard knows the road ahead is ${occupancy(fg, j)}/${P.storage[j]} full, so it ${fg.sig[j].phase === 'main' ? 'keeps main green only while there is space' : 'gives the green to the side street instead'}.`,
+      fg: `Same cars, same second. RoadSync knows the road ahead is ${occupancy(fg, j)}/${P.storage[j]} full, so it ${fg.sig[j].phase === 'main' ? 'keeps main green only while there is space' : 'gives the green to the side street instead'}.`,
     }
   })()
 
@@ -262,7 +262,7 @@ export default function ControlRoom() {
               <Corridor3D world={world} getSpeed={getSpeed} names={corridor.junctions} highlight={explain ? explain.j : null} />
             </Suspense>
             {ex && <p className="rounded-md bg-critical/8 px-2 py-1 text-[13px]"><b>Local adaptive:</b> {ex.ad}</p>}
-            {ex && <p className="rounded-md bg-accent/8 px-2 py-1 text-[13px]"><b>FlowGuard:</b> {ex.fg}</p>}
+            {ex && <p className="rounded-md bg-accent/8 px-2 py-1 text-[13px]"><b>RoadSync:</b> {ex.fg}</p>}
             <p className="text-[11px] text-muted">Drag to rotate (desktop). Red glowing box = green light into a full road. Bars beside each link show how full the road ahead is.</p>
           </div>
         ) : (
@@ -277,7 +277,7 @@ export default function ControlRoom() {
               </div>
               <Lane sim={world.sims[i]} names={corridor.junctions} highlight={explain && i > 0 ? explain.j : null} />
               {ex && i === 1 && <p className="mb-2 rounded-md bg-critical/8 px-2 py-1 text-[13px]"><b>Local adaptive:</b> {ex.ad}</p>}
-              {ex && i === 2 && <p className="mb-2 rounded-md bg-accent/8 px-2 py-1 text-[13px]"><b>FlowGuard:</b> {ex.fg}</p>}
+              {ex && i === 2 && <p className="mb-2 rounded-md bg-accent/8 px-2 py-1 text-[13px]"><b>RoadSync:</b> {ex.fg}</p>}
             </div>
           ))}
         </div>

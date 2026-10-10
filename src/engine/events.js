@@ -1,4 +1,4 @@
-// Scripted events for the demo. Written from real events; FlowGuard was not used in either.
+// Scripted events for the demo. Written from real events; RoadSync was not used in either.
 // Volumes, durations and bypass times are ASSUMED values.
 
 export const EVENTS = {

@@ -14,7 +14,7 @@ for (const [key, cfg] of Object.entries(SCENARIOS)) {
     const runs = SEEDS.map(s => runScenario(cfg, c.key, s))
     per[c.key] = Object.fromEntries(['delay', 'vehHours', 'tripAC', 'spill', 'wastedPerHour', 'sideMax', 'etaNaive', 'etaQA'].map(k => [k, round(mean(runs.map(r => r[k])))]))
   }
-  out.scenarios[key] = { label: cfg.label, ...per, savedVehHours: round(per.adaptive.vehHours - per.flowguard.vehHours) }
-  console.log(key, 'saved', out.scenarios[key].savedVehHours, 'waste', per.adaptive.wastedPerHour, '→', per.flowguard.wastedPerHour, 'eta', per.adaptive.etaNaive, '→', per.adaptive.etaQA)
+  out.scenarios[key] = { label: cfg.label, ...per, savedVehHours: round(per.adaptive.vehHours - per.roadsync.vehHours) }
+  console.log(key, 'saved', out.scenarios[key].savedVehHours, 'waste', per.adaptive.wastedPerHour, '→', per.roadsync.wastedPerHour, 'eta', per.adaptive.etaNaive, '→', per.adaptive.etaQA)
 }
 writeFileSync(new URL('../src/engine/results.json', import.meta.url), JSON.stringify(out, null, 2) + '\n')

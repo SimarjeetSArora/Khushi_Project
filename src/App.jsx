@@ -53,7 +53,7 @@ function Shell() {
               <svg width="16" height="16" viewBox="0 0 16 16"><path d="M1 12 L5 6 L8 9 L11 3 L15 8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </div>
             <div>
-              <h1 className="text-base font-bold tracking-tight sm:text-[17px]">FlowGuard <span className="hidden font-normal text-ink-2 sm:inline">· Round 3 demo</span></h1>
+              <h1 className="text-base font-bold tracking-tight sm:text-[17px]">RoadSync <span className="hidden font-normal text-ink-2 sm:inline">· Round 3 demo</span></h1>
               <div className="hidden text-xs text-ink-2 sm:block">One forecast engine · five dashboards · no live Mappls connection</div>
             </div>
             <SimTag>⚠ Simulated data</SimTag>
@@ -83,7 +83,7 @@ function Shell() {
       </main>
 
       <footer className="mx-auto max-w-[1600px] px-4 pb-6 text-[11.5px] text-muted sm:px-5">
-        All figures are simulated by a simplified engine built for this demo and are uncalibrated. Event cards are written from real events; FlowGuard was not used in them.
+        All figures are simulated by a simplified engine built for this demo and are uncalibrated. Event cards are written from real events; RoadSync was not used in them.
         Delivery orders are sample data; bypass and approach times are assumed.
       </footer>
     </>

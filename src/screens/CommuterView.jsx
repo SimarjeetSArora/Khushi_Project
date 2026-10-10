@@ -11,7 +11,7 @@ const TRIPS = {
   puja: { from: 'Howrah', to: 'Gariahat', normal: 38, reach: 12 },
 }
 
-// FlowGuard forecast (min) for a driver leaving `depart` minutes from now: the closure delay
+// RoadSync forecast (min) for a driver leaving `depart` minutes from now: the closure delay
 // depends on how much diverted traffic is on the corridor when the driver reaches it.
 function forecast(ev, split, status, depart) {
   const trip = TRIPS[ev.id]
@@ -56,13 +56,13 @@ function Phone({ ev, status, split, revealed }) {
             <b className="text-lg">{trip.normal} min</b>
           </div>
           <div className="rounded-lg bg-[#cde2fb] p-2">
-            <div className="text-[10px] text-[#0d366b]">FlowGuard forecast</div>
+            <div className="text-[10px] text-[#0d366b]">RoadSync forecast</div>
             <b className="text-lg text-[#0d366b]">{Math.round(fg)} min</b>
           </div>
         </div>
         {revealed && ev && (
           <div className="mt-2 rounded-lg border border-[#0ca30c] p-2 text-center">
-            Actual trip: <b>{Math.round(actual)} min</b> · FlowGuard off by {Math.abs(actual - fg).toFixed(1)} min, last-trip estimate off by {Math.round(actual - trip.normal)} min
+            Actual trip: <b>{Math.round(actual)} min</b> · RoadSync off by {Math.abs(actual - fg).toFixed(1)} min, last-trip estimate off by {Math.round(actual - trip.normal)} min
           </div>
         )}
       </div>
@@ -104,7 +104,7 @@ export default function CommuterView() {
                   <div className="text-[11px] text-muted">Trips finished before the closure; learns too late</div>
                 </div>
                 <div className="rounded-lg bg-accent/10 p-3">
-                  <div className="text-xs text-ink-2">FlowGuard forecast</div>
+                  <div className="text-xs text-ink-2">RoadSync forecast</div>
                   <div className="text-2xl font-bold">{Math.round(travelNow)} min</div>
                   <div className="text-[11px] text-muted">Queues and diverted inflow on the route ahead</div>
                 </div>

@@ -1,4 +1,4 @@
-// FlowGuard corridor engine — a seeded, second-by-second queue simulation of a 3-junction corridor
+// RoadSync corridor engine — a seeded, second-by-second queue simulation of a 3-junction corridor
 // (A → B → C → downstream signal D) run under three controllers with identical arrivals.
 // All numbers it produces are SIMULATED and uncalibrated.
 
@@ -29,7 +29,7 @@ const FREE_FLOW_AC = P.freeFlow[0] + P.freeFlow[1]
 export const CONTROLLERS = [
   { key: 'fixed', label: 'Fixed timer' },
   { key: 'adaptive', label: 'Local adaptive' },
-  { key: 'flowguard', label: 'FlowGuard' },
+  { key: 'roadsync', label: 'RoadSync' },
 ]
 
 // main / side = arrival rates (veh/h); exitGreen = seconds of green per 90 s cycle at downstream signal D
@@ -106,9 +106,9 @@ function wantAdaptive(sim, j) {
   return 'side'
 }
 
-// FlowGuard = the same local logic, plus it knows how full the road ahead is:
+// RoadSync = the same local logic, plus it knows how full the road ahead is:
 // it never holds main green into a full link, and uses that time for the side street.
-function wantFlowGuard(sim, j) {
+function wantRoadSync(sim, j) {
   const g = sim.sig[j]
   const el = sim.t - g.since
   const full = occupancy(sim, j) >= P.storage[j] - 1
@@ -122,7 +122,7 @@ function wantFlowGuard(sim, j) {
   return wantAdaptive(sim, j)
 }
 
-const WANT = { fixed: wantFixed, adaptive: wantAdaptive, flowguard: wantFlowGuard }
+const WANT = { fixed: wantFixed, adaptive: wantAdaptive, roadsync: wantRoadSync }
 
 // Queue-aware ETA (A→C) for a vehicle joining A now: play the current queues, signals and
 // downstream space forward on a copy of the corridor, with no knowledge of future arrivals.

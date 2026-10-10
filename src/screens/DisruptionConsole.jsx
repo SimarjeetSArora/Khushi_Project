@@ -50,7 +50,7 @@ function EventCard({ ev, status, clock }) {
         ))}
       </dl>
       <p className="mt-3 rounded-md bg-sim-bg px-2 py-1 text-[11px] font-semibold text-sim-ink">
-        Based on real event ({ev.basedOn}); FlowGuard was not used. Volumes and times are assumed.
+        Based on real event ({ev.basedOn}); RoadSync was not used. Volumes and times are assumed.
       </p>
     </Card>
   )
@@ -136,7 +136,7 @@ export default function DisruptionConsole() {
         <div className="grid min-w-0 content-start gap-4">
           <EventCard ev={ev} status={status} clock={clock} />
 
-          <Card title="Options" hint="FlowGuard forecasts the cost; the authority decides">
+          <Card title="Options" hint="RoadSync forecasts the cost; the authority decides">
             <div className="grid gap-2">
               {opts.map(o => {
                 const isApproved = approved?.id === o.id

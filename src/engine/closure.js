@@ -37,7 +37,7 @@ export function options(s) {
     {
       id: 'replan',
       title: `Re-plan corridor signals at ${pct(s)}% split`,
-      detail: 'FlowGuard re-times the corridor junctions for the forecast inflow; split unchanged.',
+      detail: 'RoadSync re-times the corridor junctions for the forecast inflow; split unchanged.',
       delay: residentDelay(s, true),
       trip: divertedTrip(s),
       split: s,
